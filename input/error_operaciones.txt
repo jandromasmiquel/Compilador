@@ -1,0 +1,48 @@
+// Prueba: Errores en operaciones
+
+vacio main() {
+    entero x;
+    entero y;
+    cadena texto;
+    caracter letra;
+    booleano flag;
+    
+    x = 10;
+    y = 5;
+    texto = "hola";
+    letra = 'a';
+    flag = verdadero;
+    
+    // Operaciones aritméticas con tipos incorrectos
+    x = texto + y;         // ERROR: No se puede sumar cadena con entero
+    x = letra - 5;         // ERROR: No se puede restar entero de caracter
+    x = flag * 2;          // ERROR: No se puede multiplicar booleano
+    x = texto / y;         // ERROR: No se puede dividir cadena
+    
+    // Operaciones lógicas con tipos incorrectos
+    flag = x && y;         // ERROR: && requiere booleanos (aunque podrían ser enteros en algunos lenguajes)
+    flag = texto || letra; // ERROR: || requiere booleanos
+    flag = !x;             // ERROR: ! requiere booleano
+    flag = !texto;         // ERROR: ! requiere booleano
+    
+    // Operaciones relacionales con tipos incompatibles
+    flag = x > texto;      // ERROR: No se puede comparar entero con cadena
+    flag = letra < texto;  // ERROR: No se puede comparar caracter con cadena
+    flag = flag >= x;      // ERROR: No se puede comparar booleano con entero
+    
+    // Comparaciones válidas solo con == y !=
+    flag = texto > letra;  // ERROR: > no válido para cadena
+    flag = flag < verdadero; // ERROR: < no válido para booleano
+    
+    // Mezcla incorrecta en expresiones complejas
+    flag = (x > 5) + (y < 10);  // ERROR: No se pueden sumar booleanos
+    x = (x > 5) * 10;           // ERROR: No se puede multiplicar booleano por entero
+    
+    // Operaciones correctas para comparar
+    x = 5 + 10;           // OK
+    flag = x > y;         // OK
+    flag = flag && verdadero;  // OK
+    flag = texto == "mundo";   // OK
+    flag = letra == 'b';  // OK
+    
+}

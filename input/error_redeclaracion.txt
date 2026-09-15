@@ -1,0 +1,30 @@
+// Prueba: Redeclaración de variables y funciones
+
+entero x;
+entero x;  // ERROR: Variable ya declarada
+
+entero suma(entero a, entero b) {
+    entero resultado;
+    entero resultado;  // ERROR: Variable ya declarada en el mismo ámbito
+    resultado = a + b;
+    devolver resultado;
+}
+
+entero suma(entero x, entero y) {  // ERROR: Función ya declarada
+    devolver x + y;
+}
+
+vacio funcion3(entero x, entero y, entero z, entero y) {  // ERROR: Parámetro 'y' declarado más de una vez
+    escribir(x);
+}
+
+
+entero principal() {
+    entero z;
+    z = 5;
+    si (z > 0) {
+        entero z;  // OK: Diferente ámbito
+        z = 10;
+    }
+    devolver 0;
+}

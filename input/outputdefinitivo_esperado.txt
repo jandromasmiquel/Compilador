@@ -1,0 +1,85 @@
+== INICIO ==
+SALUDO
+Suma 1..10:
+55
+While 1..5:
+1
+2
+3
+4
+5
+Factorial 5:
+120
+Clasificacion edad 70:
+2
+Bono senior:
+100
+Array entero original:
+33
+64
+25
+12
+22
+11
+Array entero modificado:
+100
+64
+25
+12
+22
+7
+Suma array entero:
+230
+Max array entero:
+100
+Copia del array:
+100
+64
+25
+12
+22
+7
+Array entero reversed:
+7
+22
+12
+25
+64
+100
+Array entero ordenado:
+7
+12
+22
+25
+64
+100
+Caracteres:
+a
+e
+Caracteres modificados:
+a
+z
+c
+d
+e
+Booleanos:
+OK flags[0] && !flags[1]
+Cadenas:
+Juan
+Maria
+Pedro
+Cadenas modificadas:
+Juan
+Maria
+Ana
+ContadorGlobal:
+5
+Suma matriz 2D:
+30
+Elemento del cubo 3D:
+123
+Elemento del cubo 3D inicializado:
+8
+Suma CUBO 3D inicializado:
+36
+== FIN ==

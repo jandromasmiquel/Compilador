@@ -1,0 +1,49 @@
+// Prueba: Errores con arrays
+
+
+vacio main() {
+
+    // Array 3D  
+    entero[2][2][2] cubo;
+    // Array 2D
+    entero[2][3] matriz;
+    entero[5] numeros = [1, 2, 3, 4, 5];
+    entero x;
+    cadena texto;
+    
+    // Array con tamaño incorrecto
+    entero[3] valores = [1, 2, 3, 4, 5];  // ERROR: Tamaño declarado 3, valores dados 5
+    
+    // Acceso a array no declarado
+    x = noExiste[0];  // ERROR: Array 'noExiste' no declarado
+    
+    // Acceso con índice no entero
+    x = numeros[texto];      // ERROR: Índice debe ser de tipo entero
+    x = numeros["hola"];     // ERROR: Índice debe ser de tipo entero
+    
+    // Acceso a variable no array
+    x = 10;
+    texto = x[0];  // ERROR: 'x' no es un array
+    
+    // Asignación a índice con tipo incorrecto
+    numeros[texto] = 100;  // ERROR: Índice debe ser de tipo entero
+    
+    // Tipo incorrecto en asignación a elemento
+    numeros[0] = "texto";  // ERROR: Tipo incompatible (esperado: entero, dado: cadena)
+    
+    // Uso correcto para comparar
+    x = numeros[0];       // OK
+    numeros[1] = 42;      // OK
+    x = numeros[x];       // OK: usar variable entera como índice
+    
+
+    // Error: acceder a array 2D con 3 índices
+    x = matriz[0][0][0];
+    
+    // Error: acceder a array 3D con 2 índices
+    entero y = cubo[0][0];
+    
+    // Error: acceder a array 3D con 1 índice
+    entero z = cubo[0];
+
+}

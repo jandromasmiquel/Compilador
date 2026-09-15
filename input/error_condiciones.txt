@@ -1,0 +1,56 @@
+// Prueba: Errores en condiciones de estructuras de control
+
+vacio main() {
+    entero x;
+    cadena texto;
+    caracter letra;
+    
+    x = 10;
+    texto = "hola";
+    letra = 'a';
+    
+    // Si con condición no booleana/entera
+    si (texto) {  // ERROR: Condición debe ser booleana o entera
+        x = 5;
+    }
+    
+    si (letra) {  // ERROR: Condición debe ser booleana o entera
+        x = 10;
+    }
+    
+    // Mientras con condición incorrecta
+    mientras (texto) {  // ERROR: Condición debe ser booleana o entera
+        x = x + 1;
+    }
+    
+    mientras (letra) {  // ERROR: Condición debe ser booleana o entera
+        x = x - 1;
+    }
+    
+    // Para con condición incorrecta
+    para (x = 0; texto; x = x + 1) {  // ERROR: Condición debe ser booleana o entera
+        escribir(x);
+    }
+    
+    para (x = 0; letra; x = x + 1) {  // ERROR: Condición debe ser booleana o entera
+        escribir(x);
+    }
+    
+    // Condiciones correctas para comparar
+    si (x > 0) {        // OK: comparación devuelve booleano
+        escribir(x);
+    }
+    
+    si (x) {            // OK: entero permitido en condición
+        escribir(x);
+    }
+    
+    mientras (x < 100) { // OK
+        x = x + 1;
+    }
+    
+    para (x = 0; x < 10; x = x + 1) {  // OK
+        escribir(x);
+    }
+    
+}

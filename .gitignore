@@ -1,0 +1,26 @@
+# Archivos de compilación de Java
+bin/
+*.class
+
+# Archivos de salida del compilador (excepto .gitkeep)
+output/*
+!output/.gitkeep
+
+# Archivos temporales y de respaldo de editores
+*~
+*.bak
+*.tmp
+*.swp
+
+# Entornos de desarrollo e IDEs
+.idea/
+.vscode/
+*.classpath
+*.project
+.settings/
+*.iml
+.nbproperties
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db

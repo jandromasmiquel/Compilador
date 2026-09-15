@@ -1,0 +1,342 @@
+// ======================================================
+// PRUEBA DEFINITIVA DEL LENGUAJE / COMPILADOR (ACADÉMICO)
+// ======================================================
+
+// ----------- Constantes y variables globales -----------
+constante entero MIN_EDAD = 18;
+
+entero contadorGlobal = 0;
+
+
+// ----------------- Funciones void (vacio) --------------
+vacio linea(cadena t) {
+    escribir(t);
+}
+
+vacio incrementarContadorGlobal(entero veces) {
+    entero k = 0;
+    mientras (k < veces) {
+        contadorGlobal = contadorGlobal + 1;
+        k = k + 1;
+    }
+}
+
+vacio saludar() {
+    escribir("SALUDO");
+}
+
+
+// ---------------- Funciones con retorno ----------------
+entero suma(entero a, entero b) {
+    devolver a + b;
+}
+
+// Recursión
+entero factorial(entero n) {
+    si (n <= 1) {
+        devolver 1;
+    } sino {
+        devolver n * factorial(n - 1);
+    }
+}
+
+// Constante local + condicionales
+entero clasificarEdad(entero edad) {
+    constante entero EDAD_SENIOR = 65;
+
+    si (edad < MIN_EDAD) {
+        devolver 0; // menor
+    }
+
+    si (edad >= EDAD_SENIOR) {
+        devolver 2; // senior
+    }
+
+    devolver 1; // adulto
+}
+
+// -------------------------- main ------------------------
+vacio main() {
+
+    linea("== INICIO ==");
+    saludar();
+
+    // =========================
+    // 1) Loops: para + suma
+    // =========================
+    entero  i = 0;
+    entero sumaTotal = 0;
+
+    para (i = 1; i <= 10; i = i + 1) {
+        sumaTotal = sumaTotal + i;
+    }
+    escribir("Suma 1..10:");
+    escribir(sumaTotal);
+
+    // =========================
+    // 2) while simple
+    // =========================
+    escribir("While 1..5:");
+    i = 1;
+    mientras (i <= 5) {
+        escribir(i);
+        i = i + 1;
+    }
+
+    // =========================
+    // 3) Recursión
+    // =========================
+    escribir("Factorial 5:");
+    escribir(factorial(5));
+
+    // =========================
+    // 4) Constantes, alcance y if/sino
+    // =========================
+    entero edad;
+    edad = 70;
+
+    escribir("Clasificacion edad 70:");
+    escribir(clasificarEdad(edad));
+
+
+    si (clasificarEdad(edad) == 2) {
+        entero bono;
+        bono = 100;
+
+        // variable solo en este bloque
+        escribir("Bono senior:");
+        escribir(bono);
+    } sino {
+        escribir("Sin bono");
+    }
+
+    // =========================
+    // 5) Arrays de enteros: acceso, modificación, suma, max, copia, reverse
+    // =========================
+    entero[6] a = [33, 64, 25, 12, 22, 11];
+    entero[6] copia;
+    entero sumaA;
+    entero maxA;
+
+    escribir("Array entero original:");
+    i = 0;
+    mientras (i < 6) {
+        escribir(a[i]);
+        i = i + 1;
+    }
+
+    // Modificación por índice
+    a[0] = 100;
+    a[5] = 7;
+
+    escribir("Array entero modificado:");
+    para (i = 0; i < 6; i = i + 1) {
+        escribir(a[i]);
+    }
+
+    // Suma y máximo
+    sumaA = 0;
+    maxA = a[0];
+    i = 0;
+    mientras (i < 6) {
+        sumaA = sumaA + a[i];
+        si (a[i] > maxA) {
+            maxA = a[i];
+        }
+        i = i + 1;
+    }
+    escribir("Suma array entero:");
+    escribir(sumaA);
+    escribir("Max array entero:");
+    escribir(maxA);
+
+    // Copia
+    para (i = 0; i < 6; i = i + 1) {
+        copia[i] = a[i];
+    }
+    escribir("Copia del array:");
+    i = 0;
+    mientras (i < 6) {
+        escribir(copia[i]);
+        i = i + 1;
+    }
+
+    // Reverse in-place (swap)
+    entero left;
+    entero right;
+    entero temp;
+
+    left = 0;
+    right = 5;
+    mientras (left < right) {
+        temp = a[left];
+        a[left] = a[right];
+        a[right] = temp;
+
+        left = left + 1;
+        right = right - 1;
+    }
+    escribir("Array entero reversed:");
+    para (i = 0; i < 6; i = i + 1) {
+        escribir(a[i]);
+    }
+
+    // =========================
+    // 6) Ordenación (Bubble Sort) con while anidados
+    // =========================
+    // Ordenaremos 'copia' (que mantiene el array modificado pero sin reverse)
+    entero j;
+    entero limite;
+    entero jSig;
+
+    limite = 5;
+    i = 0;
+    mientras (i < limite) {
+        j = 0;
+        mientras (j < limite) {
+            jSig = j + 1;
+            si (copia[j] > copia[jSig]) {
+                temp = copia[j];
+                copia[j] = copia[jSig];
+                copia[jSig] = temp;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+
+    escribir("Array entero ordenado:");
+    i = 0;
+    mientras (i < 6) {
+        escribir(copia[i]);
+        i = i + 1;
+    }
+
+    // =========================
+    // 7) Arrays de caracter
+    // =========================
+    caracter[5] letras = ['a', 'b', 'c', 'd', 'e'];
+    escribir("Caracteres:");
+    escribir(letras[0]);
+    escribir(letras[4]);
+
+    letras[1] = 'z';
+    escribir("Caracteres modificados:");
+    para (i = 0; i < 5; i = i + 1) {
+        escribir(letras[i]);
+    }
+
+    // =========================
+    // 8) Arrays de booleano + lógica
+    // =========================
+    booleano[3] flags = [verdadero, falso, verdadero];
+    escribir("Booleanos:");
+    si (flags[0] && !flags[1]) {
+        escribir("OK flags[0] && !flags[1]");
+    } sino {
+        escribir("NO OK");
+    }
+
+    // =========================
+    // 9) Arrays de cadena
+    // =========================
+    cadena[3] nombres = ["Juan", "Maria", "Pedro"];
+    escribir("Cadenas:");
+    escribir(nombres[0]);
+    escribir(nombres[1]);
+    escribir(nombres[2]);
+
+    nombres[2] = "Ana";
+    escribir("Cadenas modificadas:");
+    para (i = 0; i < 3; i = i + 1) {
+        escribir(nombres[i]);
+    }
+
+    // =========================
+    // 10) void con efecto global
+    // =========================
+    incrementarContadorGlobal(3);
+    incrementarContadorGlobal(2);
+    escribir("ContadorGlobal:");
+    escribir(contadorGlobal);
+
+
+    // =========================
+    // 11) arrays multidimensionales
+    // =========================
+    // Array 2D sin inicialización
+    entero[3][4] matriz;
+    // Array 3D con inicialización (2 planos de 2x2)
+    entero[2][2][2] cubo_init = {[[1, 2], [3, 4]], [[5, 6], [7, 8]]};
+    // Array 3D sin inicialización
+    entero[2][3][4] cubo;
+    // Inicializar matriz manualmente
+    i = 0;
+    j = 0;
+    
+    // Llenar la matriz con valores
+    para (i = 0; i < 3; i = i + 1) {
+        para (j = 0; j < 4; j = j + 1) {
+            matriz[i][j] = i  + j;
+        }
+    }
+    // Sumar todos los elementos de la matriz
+    entero suma = 0;
+    para (i = 0; i < 3; i = i + 1) {
+        para (j = 0; j < 4; j = j + 1) {
+            suma = suma + matriz[i][j];
+        }
+    }
+    escribir("Suma matriz 2D:");
+    escribir(suma);
+    i = 0;
+    j = 0;
+    entero k = 0;
+    
+    // Llenar el cubo con valores
+    mientras (i < 2) {
+        j = 0;
+        mientras (j < 3) {
+            k = 0;
+            mientras (k < 4) {
+                // Valor = i*100 + j*10 + k
+                entero valor = i * 100 + j * 10 + k;
+                cubo[i][j][k] = valor;
+                k = k + 1;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    
+    // Leer un valor del cubo
+    entero elem = cubo[1][2][3];
+    escribir("Elemento del cubo 3D:");
+    escribir(elem);
+    
+    // Leer del cubo inicializado
+    entero elem2 = cubo_init[1][1][1];
+    escribir("Elemento del cubo 3D inicializado:");
+    escribir(elem2);
+    
+    // Suma de todos los elementos del cubo_init
+    suma = 0;
+    i = 0;
+    mientras (i < 2) {
+        j = 0;
+        mientras (j < 2) {
+            k = 0;
+            mientras (k < 2) {
+                suma = suma + cubo_init[i][j][k];
+                k = k + 1;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    escribir("Suma CUBO 3D INICIALIZADO:");
+    escribir(suma);
+    
+    linea("== FIN ==");
+
+}

@@ -1,0 +1,1212 @@
+package com.compilador.sintactico;
+
+import java_cup.runtime.*;
+import com.compilador.lexico.Scanner;
+import com.compilador.ast.*;
+import com.compilador.semantico.*;
+import com.compilador.herramientas.GestorErrores;
+import java.util.*;
+
+/**
+ * Especificación CUP para el análisis sintáctico con análisis semántico integrado
+ * Este archivo debe ser procesado con CUP para generar Parser.java y sym.java
+ * 
+ * Comando: java -jar lib/java-cup-11b.jar -parser Parser -symbols sym -destdir src/com/compilador/sintactico src/com/compilador/sintactico/Parser.cup
+ */
+
+/* Código del parser */
+parser code {:
+    public TablaSimbolos tablaSimbolos = new TablaSimbolos();
+    public GestorErrores gestorErrores = new GestorErrores();
+    public ComprobadorTipos comprobadorTipos = new ComprobadorTipos(gestorErrores);
+    private int contadorBloques = 0;
+    
+    public void syntax_error(Symbol s) {
+        gestorErrores.reportarErrorSintactico(s.left+1, "Token inesperado");
+    }
+    
+    public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception {
+        gestorErrores.reportarErrorSintactico(s.left+1, "Error de sintaxis irrecuperable");
+        throw new Exception("No se puede continuar con el análisis");
+    }
+    
+    public TablaSimbolos getTablaSimbolos() {
+        return tablaSimbolos;
+    }
+    
+    public GestorErrores getGestorErrores() {
+        return gestorErrores;
+    }
+    
+    public String nuevoNombreBloque() {
+        return "bloque" + (++contadorBloques);
+    }
+:}
+
+/* Terminales (tokens) */
+terminal ENTERO_TIPO, CADENA_TIPO, BOOLEANO_TIPO, CARACTER_TIPO, VACIO_TIPO, CONSTANTE;
+terminal VERDADERO, FALSO;
+terminal SI, SINO, MIENTRAS, PARA, DEVOLVER, ESCRIBIR, LEER;
+terminal MAS, MENOS, POR, DIV, ASIGNAR;
+terminal IGUAL, DIFERENTE, MENOR, MAYOR, MENORIGUAL, MAYORIGUAL;
+terminal AND, OR, NOT;
+terminal PAREN_IZQ, PAREN_DER, LLAVE_IZQ, LLAVE_DER, CORCHETE_IZQ, CORCHETE_DER, PUNTO, PUNTO_COMA, COMA;
+terminal Integer NUMERO;
+terminal String CADENA, ID, CARACTER_LIT;
+
+/* Esperar 2 conflictos reduce/reduce (arrays 2D y 3D con/sin inicialización en sentencias) */
+
+/* No terminales con tipos */
+non terminal NodoPrograma programa;
+non terminal List<Nodo> lista_declaraciones;
+non terminal Nodo declaracion;
+non terminal NodoFuncion declaracion_funcion;
+non terminal NodoDeclaracionVariable declaracion_variable;
+non terminal NodoSentencia declaracion_local;
+non terminal TipoDato tipo;
+non terminal List<NodoDeclaracionVariable> parametros, lista_parametros;
+non terminal NodoDeclaracionVariable parametro;
+non terminal NodoBloque bloque, bloque_con_ambito;
+non terminal List<NodoSentencia> lista_sentencias;
+non terminal NodoSentencia sentencia;
+non terminal NodoSentencia sentencia_asignacion;
+non terminal NodoSentencia asignacion_simple;
+non terminal NodoSentencia sentencia_llamada;
+non terminal NodoSi sentencia_si;
+non terminal NodoMientras sentencia_mientras;
+non terminal NodoParaBucle sentencia_para;
+non terminal NodoDevolver sentencia_devolver;
+non terminal NodoEscribir sentencia_escribir;
+non terminal NodoSentencia sentencia_leer;
+non terminal NodoExpresion expresion, expresion_logica, expresion_relacional, expresion_aditiva;
+non terminal NodoExpresion expresion_multiplicativa, expresion_primaria;
+non terminal List<NodoExpresion> lista_expresiones, lista_valores, lista_valores_2d, lista_valores_3d;
+non terminal List<Integer> lista_dimensiones;
+non terminal List<NodoExpresion> lista_indices;
+non terminal NodoLlamadaFuncion llamada_funcion;
+
+/* Precedencia y asociatividad */
+precedence nonassoc SINO;
+precedence left OR;
+precedence left AND;
+precedence left IGUAL, DIFERENTE, MENOR, MAYOR, MENORIGUAL, MAYORIGUAL;
+precedence left MAS, MENOS;
+precedence left POR, DIV;
+precedence right NOT;
+
+/* Gramática con acciones semánticas */
+
+start with programa;
+
+programa ::= lista_declaraciones:decls
+    {: RESULT = new NodoPrograma(decls); :}
+    ;
+
+lista_declaraciones ::= lista_declaraciones:lista declaracion:decl
+    {: 
+        lista.add(decl);
+        RESULT = lista;
+    :}
+    | declaracion:decl
+    {: 
+        List<Nodo> lista = new ArrayList<>();
+        lista.add(decl);
+        RESULT = lista;
+    :}
+    ;
+
+declaracion ::= declaracion_funcion:func
+    {: RESULT = func; :}
+    | declaracion_variable:var
+    {: RESULT = var; :}
+    ;
+
+tipo ::= ENTERO_TIPO
+    {: RESULT = TipoDato.ENTERO; :}
+    | CADENA_TIPO
+    {: RESULT = TipoDato.CADENA; :}
+    | CARACTER_TIPO
+    {: RESULT = TipoDato.CARACTER; :}
+    | BOOLEANO_TIPO
+    {: RESULT = TipoDato.BOOLEANO; :}
+    | VACIO_TIPO
+    {: RESULT = TipoDato.VOID; :}
+    ;
+
+declaracion_variable ::= tipo:t ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        if (!parser.tablaSimbolos.insertar(nombre, t, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Variable ya declarada: " + nombre);
+        }
+        RESULT = new NodoDeclaracionVariable(t, nombre, linea);
+    :}
+    | tipo:t ID:nombre ASIGNAR expresion:exp PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Insertar la variable en la tabla de símbolos
+        if (!parser.tablaSimbolos.insertar(nombre, t, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Variable ya declarada: " + nombre);
+        }
+        RESULT = new NodoDeclaracionVariable(t, nombre, linea, exp);
+    :}
+    | CONSTANTE tipo:t ID:nombre ASIGNAR NUMERO:valor PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        if (!parser.tablaSimbolos.insertarConstante(nombre, t, linea, valor)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Constante ya declarada: " + nombre);
+        }
+        RESULT = new NodoDeclaracionVariable(t, nombre, linea, valor);
+    :}
+    ;
+
+declaracion_local ::= tipo:t ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        if (!parser.tablaSimbolos.insertar(nombre, t, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Variable ya declarada: " + nombre);
+        }
+        RESULT = new NodoDeclaracionVariable(t, nombre, linea);
+    :}
+    | tipo:t ID:nombre ASIGNAR expresion:exp PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Insertar la variable en la tabla de símbolos
+        if (!parser.tablaSimbolos.insertar(nombre, t, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Variable ya declarada: " + nombre);
+        }
+        RESULT = new NodoDeclaracionVariable(t, nombre, linea, exp);
+    :}
+    | CONSTANTE tipo:t ID:nombre ASIGNAR NUMERO:valor PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        if (!parser.tablaSimbolos.insertarConstante(nombre, t, linea, valor)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Constante ya declarada: " + nombre);
+        }
+        RESULT = new NodoDeclaracionVariable(t, nombre, linea, valor);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim CORCHETE_DER ID:nombre ASIGNAR CORCHETE_IZQ lista_valores:valores CORCHETE_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        if (!parser.tablaSimbolos.insertarArray(nombre, t, linea, (Integer)dim)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, (Integer)dim, valores, linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim CORCHETE_DER ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        if (!parser.tablaSimbolos.insertarArray(nombre, t, linea, (Integer)dim)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, (Integer)dim, new ArrayList<>(), linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        List<Integer> dims = new ArrayList<>();
+        dims.add((Integer)dim1);
+        dims.add((Integer)dim2);
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dims, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dims, new ArrayList<>(), linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER ID:nombre ASIGNAR LLAVE_IZQ lista_valores_2d:valores LLAVE_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        List<Integer> dims = new ArrayList<>();
+        dims.add((Integer)dim1);
+        dims.add((Integer)dim2);
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dims, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dims, valores, linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER CORCHETE_IZQ NUMERO:dim3 CORCHETE_DER ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        List<Integer> dims = new ArrayList<>();
+        dims.add((Integer)dim1);
+        dims.add((Integer)dim2);
+        dims.add((Integer)dim3);
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dims, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dims, new ArrayList<>(), linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER CORCHETE_IZQ NUMERO:dim3 CORCHETE_DER ID:nombre ASIGNAR LLAVE_IZQ lista_valores_3d:valores LLAVE_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        List<Integer> dims = new ArrayList<>();
+        dims.add((Integer)dim1);
+        dims.add((Integer)dim2);
+        dims.add((Integer)dim3);
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dims, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dims, valores, linea);
+    :}
+    ;
+
+lista_valores ::= expresion:e
+    {:
+        List<NodoExpresion> lista = new ArrayList<>();
+        lista.add(e);
+        RESULT = lista;
+    :}
+    | lista_valores:lista COMA expresion:e
+    {:
+        lista.add(e);
+        RESULT = lista;
+    :}
+    ;
+
+lista_valores_2d ::= CORCHETE_IZQ lista_valores:fila CORCHETE_DER
+    {:
+        // Una fila de valores
+        RESULT = new ArrayList<>(fila);
+    :}
+    | lista_valores_2d:lista COMA CORCHETE_IZQ lista_valores:fila CORCHETE_DER
+    {:
+        // Añadir otra fila
+        lista.addAll(fila);
+        RESULT = lista;
+    :}
+    ;
+
+lista_valores_3d ::= CORCHETE_IZQ lista_valores_2d:plano CORCHETE_DER
+    {:
+        // Un plano de valores (matriz 2D)
+        RESULT = new ArrayList<>(plano);
+    :}
+    | lista_valores_3d:lista COMA CORCHETE_IZQ lista_valores_2d:plano CORCHETE_DER
+    {:
+        // Añadir otro plano
+        lista.addAll(plano);
+        RESULT = lista;
+    :}
+    ;
+
+declaracion_funcion ::= tipo:tipoRet ID:nombre PAREN_IZQ 
+    {:
+        // Insertar función en tabla de símbolos global ANTES de entrar al ámbito
+        int linea = nombreleft + 1;
+        
+        // Validar que main siempre sea de tipo vacio
+        if (nombre.equals("main") && tipoRet != TipoDato.VOID) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "La función 'main' debe ser de tipo 'vacio', no '" + tipoRet + "'");
+        }
+        
+        if (!parser.tablaSimbolos.insertar(nombre, tipoRet, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Función '" + nombre + "' ya declarada");
+        } else {
+            // Marcar como función
+            TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(nombre);
+            if (simbolo != null) {
+                simbolo.setEsFuncion(true);
+            }
+        }
+        // Entrar en el ámbito de la función
+        parser.tablaSimbolos.entrarAmbito(nombre);
+    :}
+    parametros:params PAREN_DER
+    {:
+        // Guardar tipos de parámetros ANTES de procesar el cuerpo
+        List<TipoDato> tiposParams = new ArrayList<>();
+        if (params != null && !params.isEmpty()) {
+            for (NodoDeclaracionVariable param : params) {
+                tiposParams.add(param.getTipoVariable());
+            }
+        }
+        TablaSimbolos.Simbolo simboloFunc = parser.tablaSimbolos.buscar(nombre);
+        if (simboloFunc != null) {
+            simboloFunc.setTiposParametros(tiposParams);
+        }
+    :}
+    bloque:cuerpo
+    {:
+        int linea = nombreleft + 1;
+        // Salir del ámbito de la función
+        parser.tablaSimbolos.salirAmbito();
+        
+        // Validar que la función tenga return si no es void
+        parser.comprobadorTipos.verificarReturnFuncion(tipoRet, nombre, cuerpo.tieneReturnEnTodosCaminos(), linea);
+        
+        RESULT = new NodoFuncion(tipoRet, nombre, params, cuerpo, linea);
+    :}
+    ;
+
+parametros ::= lista_parametros:lista
+    {: RESULT = lista; :}
+    | /* vacío */
+    {: RESULT = new ArrayList<NodoDeclaracionVariable>(); :}
+    ;
+
+lista_parametros ::= lista_parametros:lista COMA parametro:param
+    {:
+        lista.add(param);
+        RESULT = lista;
+    :}
+    | parametro:param
+    {:
+        List<NodoDeclaracionVariable> lista = new ArrayList<>();
+        lista.add(param);
+        RESULT = lista;
+    :}
+    ;
+
+parametro ::= tipo:t ID:nombre
+    {:
+        int linea = nombreleft + 1;
+        NodoDeclaracionVariable nodo = new NodoDeclaracionVariable(t, nombre, linea);
+        // Los parámetros se insertan en la tabla de símbolos (dentro del ámbito de la función)
+        if (!parser.tablaSimbolos.insertar(nombre, t, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Parámetro '" + nombre + "' ya declarado");
+        } else {
+            // Marcar el símbolo como parámetro
+            TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(nombre);
+            if (simbolo != null) {
+                simbolo.setEsParametro(true);
+            }
+        }
+        RESULT = nodo;
+    :}
+    ;
+
+bloque ::= LLAVE_IZQ lista_sentencias:sents LLAVE_DER
+    {:
+        RESULT = new NodoBloque(sents, sentsleft + 1);
+    :}
+    | LLAVE_IZQ LLAVE_DER
+    {:
+        RESULT = new NodoBloque(new ArrayList<NodoSentencia>(), 0);
+    :}
+    ;
+
+bloque_con_ambito ::= LLAVE_IZQ
+    {:
+        // Entrar en un nuevo ámbito para el bloque
+        parser.tablaSimbolos.entrarAmbito(parser.nuevoNombreBloque());
+    :}
+    lista_sentencias:sents LLAVE_DER
+    {:
+        // Salir del ámbito del bloque
+        parser.tablaSimbolos.salirAmbito();
+        RESULT = new NodoBloque(sents, sentsleft + 1);
+    :}
+    | LLAVE_IZQ
+    {:
+        // Entrar en un nuevo ámbito para el bloque vacío
+        parser.tablaSimbolos.entrarAmbito(parser.nuevoNombreBloque());
+    :}
+    LLAVE_DER
+    {:
+        // Salir del ámbito del bloque vacío
+        parser.tablaSimbolos.salirAmbito();
+        RESULT = new NodoBloque(new ArrayList<NodoSentencia>(), 0);
+    :}
+    ;
+
+lista_sentencias ::= lista_sentencias:lista sentencia:sent
+    {:
+        if (sent != null) {
+            lista.add(sent);
+        }
+        RESULT = lista;
+    :}
+    | sentencia:sent
+    {:
+        List<NodoSentencia> lista = new ArrayList<>();
+        if (sent != null) {
+            lista.add(sent);
+        }
+        RESULT = lista;
+    :}
+    ;
+
+sentencia ::= sentencia_asignacion:asig
+    {: RESULT = asig; :}
+    | sentencia_si:si
+    {: RESULT = si; :}
+    | sentencia_mientras:mientras
+    {: RESULT = mientras; :}
+    | sentencia_para:para
+    {: RESULT = para; :}
+    | sentencia_devolver:devolver
+    {: RESULT = devolver; :}
+    | sentencia_escribir:escribir
+    {: RESULT = escribir; :}
+    | sentencia_leer:leer
+    {: RESULT = leer; :}
+    | sentencia_llamada:llamada
+    {: RESULT = llamada; :}
+    | declaracion_local:decl
+    {: RESULT = decl; :}
+    | bloque_con_ambito:bloque
+    {: RESULT = bloque; :}
+    ;
+
+sentencia_asignacion ::= ID:var ASIGNAR expresion:exp PUNTO_COMA
+    {:
+        int linea = varleft + 1;
+        // Verificar que la variable exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Variable '" + var + "' no declarada");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else {
+            // Verificar compatibilidad de tipos
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        RESULT = new NodoAsignacion(var, exp, linea);
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice CORCHETE_DER ASIGNAR expresion:exp PUNTO_COMA
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() > 1) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array unidimensional");
+        } else {
+            // Verificar compatibilidad de tipos
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        // Verificar que el índice sea entero
+        if (indice.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "El índice del array debe ser de tipo entero");
+        }
+        RESULT = new NodoAsignacionArray(var, indice, exp, linea);
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice1 CORCHETE_DER CORCHETE_IZQ expresion:indice2 CORCHETE_DER ASIGNAR expresion:exp PUNTO_COMA
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array bidimensional exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() != 2) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array bidimensional");
+        } else {
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        // Verificar que los índices sean enteros
+        if (indice1.getTipo() != TipoDato.ENTERO || indice2.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Los índices del array deben ser de tipo entero");
+        }
+        List<NodoExpresion> indices = new ArrayList<>();
+        indices.add(indice1);
+        indices.add(indice2);
+        NodoAsignacionArray nodo = new NodoAsignacionArray(var, indices, exp, linea);
+        if (simbolo != null) {
+            nodo.setDimensiones(simbolo.getDimensiones());
+        }
+        RESULT = nodo;
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice1 CORCHETE_DER CORCHETE_IZQ expresion:indice2 CORCHETE_DER CORCHETE_IZQ expresion:indice3 CORCHETE_DER ASIGNAR expresion:exp PUNTO_COMA
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array tridimensional exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() != 3) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array tridimensional");
+        } else {
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        // Verificar que los índices sean enteros
+        if (indice1.getTipo() != TipoDato.ENTERO || indice2.getTipo() != TipoDato.ENTERO || indice3.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Los índices del array deben ser de tipo entero");
+        }
+        List<NodoExpresion> indices = new ArrayList<>();
+        indices.add(indice1);
+        indices.add(indice2);
+        indices.add(indice3);
+        NodoAsignacionArray nodo = new NodoAsignacionArray(var, indices, exp, linea);
+        if (simbolo != null) {
+            nodo.setDimensiones(simbolo.getDimensiones());
+        }
+        RESULT = nodo;
+    :}
+    ;
+
+asignacion_simple ::= ID:var ASIGNAR expresion:exp
+    {:
+        int linea = varleft + 1;
+        // Verificar que la variable exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Variable '" + var + "' no declarada");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else {
+            // Verificar compatibilidad de tipos
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        RESULT = new NodoAsignacion(var, exp, linea);
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice CORCHETE_DER ASIGNAR expresion:exp
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() > 1) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array unidimensional");
+        } else {
+            // Verificar compatibilidad de tipos
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        // Verificar que el índice sea entero
+        if (indice.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "El índice del array debe ser de tipo entero");
+        }
+        RESULT = new NodoAsignacionArray(var, indice, exp, linea);
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice1 CORCHETE_DER CORCHETE_IZQ expresion:indice2 CORCHETE_DER ASIGNAR expresion:exp
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array bidimensional exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() != 2) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array bidimensional");
+        } else {
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        // Verificar que los índices sean enteros
+        if (indice1.getTipo() != TipoDato.ENTERO || indice2.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Los índices del array deben ser de tipo entero");
+        }
+        List<NodoExpresion> indices = new ArrayList<>();
+        indices.add(indice1);
+        indices.add(indice2);
+        NodoAsignacionArray nodo = new NodoAsignacionArray(var, indices, exp, linea);
+        if (simbolo != null) {
+            nodo.setDimensiones(simbolo.getDimensiones());
+        }
+        RESULT = nodo;
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice1 CORCHETE_DER CORCHETE_IZQ expresion:indice2 CORCHETE_DER CORCHETE_IZQ expresion:indice3 CORCHETE_DER ASIGNAR expresion:exp
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array tridimensional exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (simbolo.esConstante()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "No se puede asignar un valor a la constante '" + var + "'");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() != 3) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array tridimensional");
+        } else {
+            parser.comprobadorTipos.verificarAsignacion(simbolo.getTipo(), exp.getTipo(), linea);
+        }
+        // Verificar que los índices sean enteros
+        if (indice1.getTipo() != TipoDato.ENTERO || indice2.getTipo() != TipoDato.ENTERO || indice3.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Los índices del array deben ser de tipo entero");
+        }
+        List<NodoExpresion> indices = new ArrayList<>();
+        indices.add(indice1);
+        indices.add(indice2);
+        indices.add(indice3);
+        NodoAsignacionArray nodo = new NodoAsignacionArray(var, indices, exp, linea);
+        if (simbolo != null) {
+            nodo.setDimensiones(simbolo.getDimensiones());
+        }
+        RESULT = nodo;
+    :}
+    ;
+
+sentencia_si ::= SI PAREN_IZQ expresion:cond PAREN_DER sentencia:siVerdad
+    {:
+        int linea = condleft + 1;
+        parser.comprobadorTipos.verificarCondicion(cond.getTipo(), linea);
+        RESULT = new NodoSi(cond, siVerdad, null, linea);
+    :}
+    | SI PAREN_IZQ expresion:cond PAREN_DER sentencia:siVerdad SINO sentencia:siFalso
+    {:
+        int linea = condleft + 1;
+        parser.comprobadorTipos.verificarCondicion(cond.getTipo(), linea);
+        RESULT = new NodoSi(cond, siVerdad, siFalso, linea);
+    :}
+    ;
+
+sentencia_mientras ::= MIENTRAS PAREN_IZQ expresion:cond PAREN_DER sentencia:cuerpo
+    {:
+        int linea = condleft + 1;
+        parser.comprobadorTipos.verificarCondicion(cond.getTipo(), linea);
+        RESULT = new NodoMientras(cond, cuerpo, linea);
+    :}
+    ;
+
+sentencia_para ::= PARA PAREN_IZQ asignacion_simple:init PUNTO_COMA expresion:cond PUNTO_COMA asignacion_simple:incr PAREN_DER sentencia:cuerpo
+    {:
+        int linea = initleft + 1;
+        parser.comprobadorTipos.verificarCondicion(cond.getTipo(), linea);
+        RESULT = new NodoParaBucle(init, cond, incr, cuerpo, linea);
+    :}
+    ;
+
+sentencia_devolver ::= DEVOLVER expresion:exp PUNTO_COMA
+    {:
+        int linea = expleft + 1;
+        // Obtener el tipo de la función actual
+        String funcionActual = parser.tablaSimbolos.getFuncionActual();
+        if (funcionActual != null) {
+            TablaSimbolos.Simbolo funcion = parser.tablaSimbolos.buscarGlobal(funcionActual);
+            if (funcion != null) {
+                // Validar si es función void con valor
+                if (funcion.getTipo() == TipoDato.VOID) {
+                    parser.gestorErrores.reportarErrorSemantico(linea,
+                        "No se puede devolver un valor en una función de tipo vacio");
+                } else {
+                    // Validar compatibilidad de tipos entre el return y el tipo de función
+                    if (exp.getTipo() != funcion.getTipo()) {
+                        parser.gestorErrores.reportarErrorSemantico(linea,
+                            "Tipo de return incompatible: se esperaba " + funcion.getTipo() + 
+                            " pero se encontró " + exp.getTipo());
+                    }
+                }
+            }
+        }
+        RESULT = new NodoDevolver(exp, expleft + 1);
+    :}
+    | DEVOLVER PUNTO_COMA
+    {:
+        RESULT = new NodoDevolver(null, 0);
+    :}
+    ;
+
+sentencia_escribir ::= ESCRIBIR PAREN_IZQ expresion:exp PAREN_DER PUNTO_COMA
+    {:
+        RESULT = new NodoEscribir(exp, expleft + 1);
+    :}
+    ;
+
+sentencia_leer ::= LEER PAREN_IZQ ID:var PAREN_DER PUNTO_COMA
+    {:
+        int linea = varleft + 1;
+        // Verificar que la variable exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Variable '" + var + "' no declarada");
+            RESULT = null;
+        } else {
+            RESULT = new NodoLeer(var, simbolo.getTipo(), linea);
+        }
+    :}
+    ;
+
+sentencia_llamada ::= ID:nombre PAREN_IZQ lista_expresiones:args PAREN_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Verificar que la función exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(nombre);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Función '" + nombre + "' no declarada");
+        } else {
+            // Validar argumentos de la función
+            List<TipoDato> tiposArgumentos = new ArrayList<>();
+            for (NodoExpresion arg : args) {
+                tiposArgumentos.add(arg.getTipo());
+            }
+            List<TipoDato> tiposEsperados = simbolo.getTiposParametros();
+            parser.comprobadorTipos.verificarArgumentosFuncion(nombre, tiposArgumentos, tiposEsperados, linea);
+        }
+        RESULT = new NodoLlamadaSentencia(nombre, args, linea);
+    :}
+    | ID:nombre PAREN_IZQ PAREN_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Verificar que la función exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(nombre);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Función '" + nombre + "' no declarada");
+        } else {
+            // Validar argumentos de la función (sin argumentos = lista vacía)
+            List<TipoDato> tiposArgumentos = new ArrayList<>();
+            List<TipoDato> tiposEsperados = simbolo.getTiposParametros();
+            parser.comprobadorTipos.verificarArgumentosFuncion(nombre, tiposArgumentos, tiposEsperados, linea);
+        }
+        RESULT = new NodoLlamadaSentencia(nombre, new ArrayList<NodoExpresion>(), linea);
+    :}
+    ;
+
+expresion ::= expresion_logica:exp
+    {: RESULT = exp; :}
+    ;
+
+expresion_logica ::= expresion_relacional:exp
+    {: RESULT = exp; :}
+    | expresion_logica:izq AND expresion_relacional:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionLogica(
+            izq.getTipo(), der.getTipo(), "&&", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "&&", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_logica:izq OR expresion_relacional:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionLogica(
+            izq.getTipo(), der.getTipo(), "||", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "||", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    ;
+
+expresion_relacional ::= expresion_aditiva:exp
+    {: RESULT = exp; :}
+    | expresion_relacional:izq IGUAL expresion_aditiva:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionRelacional(
+            izq.getTipo(), der.getTipo(), "==", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "==", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_relacional:izq DIFERENTE expresion_aditiva:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionRelacional(
+            izq.getTipo(), der.getTipo(), "!=", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "!=", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_relacional:izq MENOR expresion_aditiva:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionRelacional(
+            izq.getTipo(), der.getTipo(), "<", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "<", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_relacional:izq MAYOR expresion_aditiva:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionRelacional(
+            izq.getTipo(), der.getTipo(), ">", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, ">", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_relacional:izq MENORIGUAL expresion_aditiva:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionRelacional(
+            izq.getTipo(), der.getTipo(), "<=", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "<=", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_relacional:izq MAYORIGUAL expresion_aditiva:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionRelacional(
+            izq.getTipo(), der.getTipo(), ">=", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, ">=", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    ;
+
+expresion_aditiva ::= expresion_multiplicativa:exp
+    {: RESULT = exp; :}
+    | expresion_aditiva:izq MAS expresion_multiplicativa:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionAritmetica(
+            izq.getTipo(), der.getTipo(), "+", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "+", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_aditiva:izq MENOS expresion_multiplicativa:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionAritmetica(
+            izq.getTipo(), der.getTipo(), "-", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "-", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    ;
+
+expresion_multiplicativa ::= expresion_primaria:exp
+    {: RESULT = exp; :}
+    | expresion_multiplicativa:izq POR expresion_primaria:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionAritmetica(
+            izq.getTipo(), der.getTipo(), "*", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "*", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    | expresion_multiplicativa:izq DIV expresion_primaria:der
+    {:
+        int linea = izqleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionAritmetica(
+            izq.getTipo(), der.getTipo(), "/", linea);
+        NodoOperacionBinaria nodo = new NodoOperacionBinaria(izq, "/", der, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    ;
+
+expresion_primaria ::= NUMERO:num
+    {:
+        RESULT = new NodoNumero(num, numleft + 1);
+    :}
+    | CADENA:cad
+    {:
+        RESULT = new NodoCadena(cad, cadleft + 1);
+    :}
+    | CARACTER_LIT:car
+    {:
+        RESULT = new NodoCaracter(car, carleft + 1);
+    :}
+    | VERDADERO:v
+    {:
+        int linea = vleft + 1;
+        NodoNumero nodo = new NodoNumero(1, linea);
+        nodo.setTipo(TipoDato.BOOLEANO);
+        RESULT = nodo;
+    :}
+    | FALSO:f
+    {:
+        int linea = fleft + 1;
+        NodoNumero nodo = new NodoNumero(0, linea);
+        nodo.setTipo(TipoDato.BOOLEANO);
+        RESULT = nodo;
+    :}
+    | llamada_funcion:llamada
+    {:
+        RESULT = llamada;
+    :}
+    | ID:var
+    {:
+        int linea = varleft + 1;
+        // Verificar que la variable exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Variable '" + var + "' no declarada");
+        }
+        NodoIdentificador nodo = new NodoIdentificador(var, linea);
+        if (simbolo != null) {
+            nodo.setTipo(simbolo.getTipo());
+        }
+        RESULT = nodo;
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice CORCHETE_DER
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() > 1) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array unidimensional");
+        }
+        // Verificar que el índice sea entero
+        if (indice.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "El índice del array debe ser de tipo entero");
+        }
+        NodoAccesoArray nodo = new NodoAccesoArray(var, indice, linea);
+        if (simbolo != null) {
+            nodo.setTipo(simbolo.getTipo());
+        }
+        RESULT = nodo;
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice1 CORCHETE_DER CORCHETE_IZQ expresion:indice2 CORCHETE_DER
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array bidimensional exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() != 2) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array bidimensional");
+        }
+        // Verificar que los índices sean enteros
+        if (indice1.getTipo() != TipoDato.ENTERO || indice2.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Los índices del array deben ser de tipo entero");
+        }
+        List<NodoExpresion> indices = new ArrayList<>();
+        indices.add(indice1);
+        indices.add(indice2);
+        NodoAccesoArray nodo = new NodoAccesoArray(var, indices, linea);
+        if (simbolo != null) {
+            nodo.setTipo(simbolo.getTipo());
+            nodo.setDimensiones(simbolo.getDimensiones());
+        }
+        RESULT = nodo;
+    :}
+    | ID:var CORCHETE_IZQ expresion:indice1 CORCHETE_DER CORCHETE_IZQ expresion:indice2 CORCHETE_DER CORCHETE_IZQ expresion:indice3 CORCHETE_DER
+    {:
+        int linea = varleft + 1;
+        // Verificar que el array tridimensional exista
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(var);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Array '" + var + "' no declarado");
+        } else if (!simbolo.esArray()) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array");
+        } else if (simbolo.getNumDimensiones() != 3) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "'" + var + "' no es un array tridimensional");
+        }
+        // Verificar que los índices sean enteros
+        if (indice1.getTipo() != TipoDato.ENTERO || indice2.getTipo() != TipoDato.ENTERO || indice3.getTipo() != TipoDato.ENTERO) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Los índices del array deben ser de tipo entero");
+        }
+        List<NodoExpresion> indices = new ArrayList<>();
+        indices.add(indice1);
+        indices.add(indice2);
+        indices.add(indice3);
+        NodoAccesoArray nodo = new NodoAccesoArray(var, indices, linea);
+        if (simbolo != null) {
+            nodo.setTipo(simbolo.getTipo());
+            nodo.setDimensiones(simbolo.getDimensiones());
+        }
+        RESULT = nodo;
+    :}
+    | PAREN_IZQ expresion:exp PAREN_DER
+    {:
+        RESULT = exp;
+    :}
+    | NOT expresion_primaria:exp
+    {:
+        int linea = expleft + 1;
+        TipoDato tipoRes = parser.comprobadorTipos.tipoOperacionUnaria("!", exp.getTipo(), linea);
+        NodoOperacionUnaria nodo = new NodoOperacionUnaria("!", exp, linea);
+        nodo.setTipo(tipoRes);
+        RESULT = nodo;
+    :}
+    ;
+
+llamada_funcion ::= ID:func PAREN_IZQ lista_expresiones:args PAREN_DER
+    {:
+        int linea = funcleft + 1;
+        // Verificar que la función exista y obtener su tipo de retorno
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(func);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Función '" + func + "' no declarada");
+        }
+        NodoLlamadaFuncion llamada = new NodoLlamadaFuncion(func, args, linea);
+        if (simbolo != null) {
+            llamada.setTipo(simbolo.getTipo());
+            // Validar argumentos de la función
+            List<TipoDato> tiposArgumentos = new ArrayList<>();
+            for (NodoExpresion arg : args) {
+                tiposArgumentos.add(arg.getTipo());
+            }
+            List<TipoDato> tiposEsperados = simbolo.getTiposParametros();
+            parser.comprobadorTipos.verificarArgumentosFuncion(func, tiposArgumentos, tiposEsperados, linea);
+        }
+        RESULT = llamada;
+    :}
+    | ID:func PAREN_IZQ PAREN_DER
+    {:
+        int linea = funcleft + 1;
+        // Verificar que la función exista y obtener su tipo de retorno
+        TablaSimbolos.Simbolo simbolo = parser.tablaSimbolos.buscar(func);
+        if (simbolo == null) {
+            parser.gestorErrores.reportarErrorSemantico(linea,
+                "Función '" + func + "' no declarada");
+        }
+        NodoLlamadaFuncion llamada = new NodoLlamadaFuncion(func, new ArrayList<NodoExpresion>(), linea);
+        if (simbolo != null) {
+            llamada.setTipo(simbolo.getTipo());
+            // Validar argumentos de la función (sin argumentos = lista vacía)
+            List<TipoDato> tiposArgumentos = new ArrayList<>();
+            List<TipoDato> tiposEsperados = simbolo.getTiposParametros();
+            parser.comprobadorTipos.verificarArgumentosFuncion(func, tiposArgumentos, tiposEsperados, linea);
+        }
+        RESULT = llamada;
+    :}
+    ;
+
+lista_expresiones ::= lista_expresiones:lista COMA expresion:exp
+    {:
+        lista.add(exp);
+        RESULT = lista;
+    :}
+    | expresion:exp
+    {:
+        List<NodoExpresion> lista = new ArrayList<>();
+        lista.add(exp);
+        RESULT = lista;
+    :}
+    ;
+declaracion_array_bidimensional ::= tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER ID:nombre ASIGNAR LLAVE_IZQ lista_valores_2d:valores LLAVE_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Declaración de array bidimensional con inicialización dentro de función
+        List<Integer> dimensiones = new ArrayList<>();
+        dimensiones.add(dim1);
+        dimensiones.add(dim2);
+        int totalEsperado = dim1 * dim2;
+        if (valores.size() != totalEsperado) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "El array bidimensional '" + nombre + "' requiere " + totalEsperado + " elementos (" + dim1 + "x" + dim2 + "), pero se proporcionaron " + valores.size());
+        }
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dimensiones, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dimensiones, valores, linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Declaración de array bidimensional sin inicialización dentro de función
+        List<Integer> dimensiones = new ArrayList<>();
+        dimensiones.add(dim1);
+        dimensiones.add(dim2);
+        List<NodoExpresion> valoresVacios = new ArrayList<>();
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dimensiones, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dimensiones, valoresVacios, linea);
+    :}
+    ;
+
+declaracion_array_tridimensional ::= tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER CORCHETE_IZQ NUMERO:dim3 CORCHETE_DER ID:nombre ASIGNAR LLAVE_IZQ lista_valores_3d:valores LLAVE_DER PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Declaración de array tridimensional con inicialización dentro de función
+        List<Integer> dimensiones = new ArrayList<>();
+        dimensiones.add(dim1);
+        dimensiones.add(dim2);
+        dimensiones.add(dim3);
+        int totalEsperado = dim1 * dim2 * dim3;
+        if (valores.size() != totalEsperado) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "El array tridimensional '" + nombre + "' requiere " + totalEsperado + " elementos (" + dim1 + "x" + dim2 + "x" + dim3 + "), pero se proporcionaron " + valores.size());
+        }
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dimensiones, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dimensiones, valores, linea);
+    :}
+    | tipo:t CORCHETE_IZQ NUMERO:dim1 CORCHETE_DER CORCHETE_IZQ NUMERO:dim2 CORCHETE_DER CORCHETE_IZQ NUMERO:dim3 CORCHETE_DER ID:nombre PUNTO_COMA
+    {:
+        int linea = nombreleft + 1;
+        // Declaración de array tridimensional sin inicialización dentro de función
+        List<Integer> dimensiones = new ArrayList<>();
+        dimensiones.add(dim1);
+        dimensiones.add(dim2);
+        dimensiones.add(dim3);
+        List<NodoExpresion> valoresVacios = new ArrayList<>();
+        if (!parser.tablaSimbolos.insertarArrayMultidimensional(nombre, t, dimensiones, linea)) {
+            parser.gestorErrores.reportarErrorSemantico(linea, 
+                "Array ya declarado: " + nombre);
+        }
+        RESULT = new NodoDeclaracionArray(t, nombre, dimensiones, valoresVacios, linea);
+    :}
+    ;

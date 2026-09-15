@@ -1,0 +1,48 @@
+// Prueba: Errores relacionados con return
+
+entero sinReturn() {
+    entero x;
+    x = 5;
+    // ERROR: Función de tipo entero debe tener return
+}
+
+entero returnCondicional(entero x) {
+    si (x > 0) {
+        devolver x;
+    }
+    // ERROR: No todos los caminos devuelven un valor
+}
+
+vacio voidConReturn() {
+    entero x;
+    x = 10;
+    devolver x;  // ERROR: Función void no puede devolver un valor
+}
+
+entero tipoReturnIncorrecto() {
+    cadena msg;
+    msg = "error";
+    devolver msg;  // ERROR: Tipo de return incompatible (esperado: entero, dado: cadena)
+}
+
+vacio funcionVoidOk() {
+    entero x;
+    x = 5;
+    escribir(x);
+    devolver;  // OK: Return sin valor en función void
+}
+
+entero funcionOk(entero n) {
+    si (n < 0) {
+        devolver 0;
+    } sino {
+        devolver n;
+    }
+    // OK: Todos los caminos devuelven un valor
+}
+
+entero principal() {
+    entero resultado;
+    resultado = sinReturn();
+    devolver 0;
+}

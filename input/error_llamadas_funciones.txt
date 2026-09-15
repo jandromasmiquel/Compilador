@@ -1,0 +1,42 @@
+// Prueba: Errores en llamadas a funciones
+
+entero suma(entero a, entero b) {
+    devolver a + b;
+}
+
+vacio mostrar(cadena msg, entero num) {
+    escribir(msg);
+    escribir(num);
+}
+
+entero factorial(entero n) {
+    si (n <= 1) {
+        devolver 1;
+    }
+    devolver n * factorial(n - 1);
+}
+
+vacio main() {
+    entero x;
+    entero y;
+    cadena texto;
+    
+    // Errores en número de argumentos
+    x = suma(5);              // ERROR: Faltan argumentos (esperados: 2, dados: 1)
+    x = suma(5, 10, 15);      // ERROR: Demasiados argumentos (esperados: 2, dados: 3)
+    mostrar("test");          // ERROR: Faltan argumentos (esperados: 2, dados: 1)
+    
+    // Errores en tipos de argumentos
+    x = suma("hola", 5);      // ERROR: Tipo incorrecto en argumento 1 (esperado: entero, dado: cadena)
+    x = suma(5, "mundo");     // ERROR: Tipo incorrecto en argumento 2 (esperado: entero, dado: cadena)
+    mostrar(10, "texto");     // ERROR: Tipos incorrectos (esperados: cadena, entero)
+    
+    // Llamada a función no existente
+    x = multiplicar(5, 3);    // ERROR: Función 'multiplicar' no declarada
+    
+    // Uso correcto para comparar
+    x = suma(5, 10);          // OK
+    mostrar("resultado", x);  // OK
+    y = factorial(5);         // OK
+    
+}

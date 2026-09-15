@@ -1,0 +1,36 @@
+// Prueba: Tipos incompatibles en asignaciones y operaciones
+
+entero principal() {
+    entero x;
+    cadena nombre;
+    caracter letra;
+    booleano flag;
+    
+    x = 10;
+    nombre = "hola";
+    letra = 'a';
+    flag = verdadero;
+    
+    // Errores de tipo en asignaciones
+    x = nombre;        // ERROR: No se puede asignar cadena a entero
+    nombre = x;        // ERROR: No se puede asignar entero a cadena
+    letra = x;         // ERROR: No se puede asignar entero a caracter
+    x = letra;         // ERROR: No se puede asignar caracter a entero
+    flag = x;          // ERROR: No se puede asignar entero a booleano
+    x = flag;          // ERROR: No se puede asignar booleano a entero
+    
+    // Errores en operaciones aritméticas
+    x = nombre + x;    // ERROR: No se puede sumar cadena con entero
+    x = letra * 5;     // ERROR: No se puede multiplicar caracter por entero
+    x = flag + 1;      // ERROR: No se puede sumar booleano con entero
+    
+    // Errores en operaciones lógicas
+    flag = x && flag;  // ERROR: && requiere dos booleanos
+    flag = nombre || letra;  // ERROR: || requiere dos booleanos
+    
+    // Errores en comparaciones
+    flag = nombre > x;  // ERROR: No se puede comparar cadena con entero
+    flag = letra + nombre;  // ERROR: + no válido entre caracter y cadena
+    
+    devolver 0;
+}

@@ -1,0 +1,34 @@
+// Prueba: Errores en asignaciones del bucle para
+
+vacio main() {
+    entero x;
+    entero y;
+    constante entero MAX = 10;
+    
+    // Asignación a constante en inicialización del para
+    para (MAX = 0; MAX < 10; MAX = MAX + 1) {  // ERROR: No se puede asignar a constante
+        escribir(MAX);
+    }
+    
+    // Asignación a constante en incremento del para
+    para (x = 0; x < 10; MAX = MAX + 1) {  // ERROR: No se puede asignar a constante
+        escribir(x);
+    }
+    
+    // Tipo incorrecto en inicialización
+    cadena texto;
+    para (texto = "hola"; x < 10; x = x + 1) {  // ERROR: Tipo incorrecto en asignación
+        escribir(x);
+    }
+    
+    // Variable no declarada en asignación
+    para (z = 0; z < 10; z = z + 1) {  // ERROR: Variable 'z' no declarada
+        escribir(z);
+    }
+    
+    // Bucle correcto para comparar
+    para (x = 0; x < 10; x = x + 1) {  // OK
+        escribir(x);
+    }
+    
+}
