@@ -1,22 +1,12 @@
-# 🛠️ Compilador Completo: Lenguaje Imperativo ➔ Ensamblador MIPS
+#  Compilador Completo: Lenguaje Imperativo ➔ Ensamblador MIPS
 
-![Java](https://img.shields.io/badge/Java-8%2B-orange?style=flat-square&logo=openjdk)
-![JFlex](https://img.shields.io/badge/JFlex-1.9.1-blue?style=flat-square)
-![Java CUP](https://img.shields.io/badge/Java_CUP-11b-red?style=flat-square)
-![Target](https://img.shields.io/badge/Target-MIPS_Assembly-green?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-purple?style=flat-square)
 
 Un compilador completo desarrollado en Java utilizando **JFlex** (análisis léxico) y **Java CUP** (análisis sintáctico LALR). Traduce un lenguaje imperativo de alto nivel con soporte para arreglos multidimensionales, estructuras de control, funciones recursivas y paso de parámetros a **Código Intermedio de 3 Direcciones (TAC)** y finalmente a **Ensamblador MIPS**.
 
 ---
 
-## 📽️ Vídeo de Presentación
 
-📺 **[Ver demostración en YouTube](https://youtu.be/YZ-QBOGzyiE)**
-
----
-
-## 📐 Arquitectura del Compilador
+##  Arquitectura del Compilador
 
 El compilador sigue una arquitectura clásica de múltiples fases:
 
@@ -49,7 +39,7 @@ El compilador sigue una arquitectura clásica de múltiples fases:
 
 ---
 
-## ✨ Características Destacadas del Lenguaje
+##  Características Destacadas del Lenguaje
 
 - **Tipos de Datos**: `entero`, `cadena`, `booleano`, `caracter`, `vacio`.
 - **Modificador de Constantes**: Soporte para `constante` globales y de ámbito local.
@@ -70,7 +60,7 @@ El compilador sigue una arquitectura clásica de múltiples fases:
 
 ---
 
-## 📁 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```
 PracticaCompiladores/
@@ -107,7 +97,7 @@ PracticaCompiladores/
 
 ---
 
-## 🚀 Compilación y Ejecución
+##  Compilación y Ejecución
 
 ### Requisitos Previos
 - **Java JDK 8** o superior instalado en el sistema.
@@ -129,7 +119,7 @@ chmod +x build.sh
 
 ---
 
-## 🔄 Regenerar el Léxico (JFlex) o Sintáctico (CUP)
+##  Regenerar el Léxico (JFlex) o Sintáctico (CUP)
 
 Si modificas la especificación léxica (`Scanner.flex`) o la gramática (`Parser.cup`):
 
@@ -145,7 +135,7 @@ java -jar lib/java-cup-11b.jar -destdir src/com/compilador/sintactico src/com/co
 
 ---
 
-## 📝 Ejemplo de Código Fuente y Salida MIPS
+##  Ejemplo de Código Fuente y Salida MIPS
 
 ### Entrada (`input/prueba_definitiva.txt` fragmento):
 ```c
@@ -174,9 +164,3 @@ L0:
 L1:
 FIN_FUNCION
 ```
-
----
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Consulta el archivo para más detalles.
